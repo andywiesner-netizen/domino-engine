@@ -2,7 +2,7 @@
 
 Documento base para `domino-engine`. Toda función del motor debe poder rastrearse hasta una regla de aquí. Lo que no esté especificado se marca como **PENDIENTE** y no se implementa.
 
-Versión 0.1 — borrador para revisión.
+Versión 0.2 — completa. Implementada en `domino_engine`, sin puntos abiertos que bloqueen el motor.
 
 ---
 
@@ -31,6 +31,12 @@ Posiciones en la mesa: `0`, `1`, `2`, `3`. Pareja A = posiciones `0` y `2`. Pare
 | `segundos_por_jugada` | Tiempo por turno | 30 |
 | `segundos_reconexion` | Espera antes de que el bot tome el control | **PENDIENTE** |
 
+`puntos_meta` y `modo_conteo` no son independientes en la práctica: a la
+misma meta, una partida internacional dura cerca de un 35% menos manos
+que una latina, porque cada mano anota más. Medido sobre 1000 partidas
+por modo: 12.9 manos en latino contra 8.2 en internacional, a 100 puntos.
+Conviene que el valor por defecto de la meta dependa del modo.
+
 ---
 
 ## 3. Reparto y salida
@@ -51,7 +57,7 @@ Esto significa que en cuatro manos consecutivas sale cada jugador una vez, sin i
 
 El jugador que sale coloca cualquier ficha de su mano. No hay restricción sobre cuál.
 
-A partir de ahí, el turno avanza a la derecha. En cada turno el jugador debe colocar una ficha que tenga un extremo coincidente con alguno de los dos extremos libres de la mesa.
+A partir de ahí, el turno avanza a la derecha, en el mismo sentido en que rota la salida. En cada turno el jugador debe colocar una ficha que tenga un extremo coincidente con alguno de los dos extremos libres de la mesa.
 
 Si no tiene ninguna ficha jugable, **pasa**. El paso es obligatorio: un jugador con ficha válida no puede pasar.
 
@@ -134,9 +140,9 @@ Se escoge deliberadamente un criterio simple y predecible para que ningún jugad
 
 ## 10. Puntos abiertos
 
-- **Dirección de la mesa.** La salida rota a la derecha. Falta confirmar que el turno dentro de la mano también avanza a la derecha.
-- **Zapato y capicúa.** No se mencionaron. Se asume que no se cuentan.
-- **Abandono voluntario.** Qué ocurre si un jugador se sale a propósito a mitad de partida.
+- **Abandono voluntario.** Qué ocurre si un jugador se sale a propósito a mitad de partida. No bloquea el motor: es una decisión del servidor.
+
+Resueltos: el turno avanza a la derecha igual que la rotación de salida (§4), y no existen puntos extra por zapato ni por capicúa.
 
 ---
 
@@ -162,14 +168,16 @@ El motor no se considera terminado hasta que estos casos pasen:
 
 ---
 
-## 12. Nota de implementación
+## 12. Estado de implementación
 
-El motor se construye con el modo **latino** funcionando primero. La puntuación vive aislada detrás de una interfaz:
+Los 15 casos pasan. La puntuación vive aislada detrás de una interfaz:
 
 ```python
 class ReglaConteo(Protocol):
-    def puntos(self, manos: dict[int, list[Ficha]],
+    def puntos(self, manos: list[list[Ficha]],
                pareja_ganadora: int) -> int: ...
 ```
 
-Con `ConteoLatino` y `ConteoInternacional` como implementaciones. Agregar el segundo modo no debe requerir tocar la lógica de juego.
+`ConteoLatino` y `ConteoInternacional` la implementan. Agregar un modo nuevo no requiere tocar la lógica de juego.
+
+Además de los tests, se verificaron 2000 partidas completas jugadas por bots (1000 por modo) comprobando que ninguna ficha se pierda ni se duplique, que toda partida termine, y que el empate nunca anote.

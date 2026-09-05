@@ -1,67 +1,71 @@
-"""Demostración: juega una mano completa en la terminal.
+"""Demostración: juega una partida completa en la terminal.
 
-NO es parte del paquete. La lógica de turnos, tranca y conteo vive aquí
-provisionalmente solo para probar que las piezas de la rebanada 1
-encajan. En la rebanada 2 se muda a domino_engine/mano.py con tests.
+Ya no implementa reglas: todo sale del motor. Sirve para ver el juego
+funcionando y como ejemplo de cómo se usa la API desde el servidor.
 
-Uso:  python ejemplo_mano.py [semilla]
+Uso:  python ejemplo_mano.py [semilla] [latino|internacional] [puntos]
 """
 
 import random
 import sys
 
-from domino_engine import Mesa, repartir, sortear_salida, sumar
+from domino_engine import FinDeMano, Partida, bot
 
-PAREJA = {0: "A", 1: "B", 2: "A", 3: "B"}
-
-
-def bot_escoge(mesa, mano):
-    """Ficha válida de mayor valor (REGLAS.md §8)."""
-    jugadas = mesa.jugadas_posibles(mano)
-    if not jugadas:
-        return None
-    return max(jugadas, key=lambda j: j[0].valor)
+PAREJA = "ABAB"
 
 
-def main(semilla):
-    rng = random.Random(semilla)
-    manos = repartir(rng)
-    turno = sortear_salida(rng)
-    mesa = Mesa()
-
-    print(f"semilla {semilla} — sale el jugador {turno} (pareja {PAREJA[turno]})\n")
-    for i, m in enumerate(manos):
-        print(f"  jugador {i} ({PAREJA[i]}): {' '.join(str(f) for f in m)}")
-    print()
-
-    pasos_seguidos = 0
-    while True:
-        jugada = bot_escoge(mesa, manos[turno])
-
+def jugar_mano(mano, verboso=True):
+    """Juega una mano completa con bots y devuelve el resultado."""
+    while not mano.terminada:
+        turno = mano.turno
+        jugada = bot.escoger(mano.mesa, mano.manos[turno])
         if jugada is None:
-            pasos_seguidos += 1
-            print(f"  jugador {turno} PASA")
-            if pasos_seguidos == 4:
-                print("\n*** TRANCA ***")
-                break
+            resultado = mano.pasar()
+            if verboso:
+                print(f"    jugador {turno} pasa")
         else:
-            pasos_seguidos = 0
-            ficha, lado = jugada
-            manos[turno].remove(ficha)
-            mesa.colocar(ficha, lado)
-            print(f"  jugador {turno} juega {ficha} por la {lado.value}")
-            print(f"      mesa: {mesa}")
-            if not manos[turno]:
-                print(f"\n*** DOMINÓ LIMPIO — jugador {turno} (pareja {PAREJA[turno]}) ***")
-                break
+            resultado = mano.jugar(*jugada)
+            if verboso:
+                ficha, lado = jugada
+                print(f"    jugador {turno} juega {ficha} por la {lado.value}")
+                print(f"        {mano.mesa}")
+    return resultado
 
-        turno = (turno + 1) % 4
 
-    a = sumar(manos[0]) + sumar(manos[2])
-    b = sumar(manos[1]) + sumar(manos[3])
-    print(f"\nfichas en mano — pareja A: {a}   pareja B: {b}")
-    print(f"jugadas en mesa: {len(mesa.cadena)} de 28")
+def main(semilla, modo, meta):
+    rng = random.Random(semilla)
+    partida = Partida(puntos_meta=meta, modo_conteo=modo)
+
+    print(f"semilla {semilla} - modo {modo} - a {meta} puntos\n")
+
+    while not partida.terminada:
+        mano = partida.nueva_mano(rng)
+        print(f"  mano {partida.manos_jugadas + 1} - sale el jugador {mano.turno}")
+        resultado = jugar_mano(mano)
+        partida.registrar(resultado)
+
+        a, b = resultado.puntos_por_pareja
+        if resultado.tipo is FinDeMano.EMPATE:
+            print(f"    TRANCA EMPATADA ({a} y {b}) - nadie anota")
+        elif resultado.tipo is FinDeMano.TRANCA:
+            gana = PAREJA[resultado.pareja_ganadora]
+            print(f"    TRANCA (A:{a} B:{b}) - pareja {gana} anota {resultado.puntos}")
+        else:
+            gana = PAREJA[resultado.pareja_ganadora]
+            print(
+                f"    DOMINO del jugador {resultado.jugador_que_cerro} - "
+                f"pareja {gana} anota {resultado.puntos}"
+            )
+        print(f"    marcador  A:{partida.marcador[0]}  B:{partida.marcador[1]}\n")
+
+    print(f"*** GANA LA PAREJA {PAREJA[partida.ganadora]} "
+          f"en {partida.manos_jugadas} manos ***")
 
 
 if __name__ == "__main__":
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else random.randrange(10000))
+    args = sys.argv[1:]
+    main(
+        int(args[0]) if len(args) > 0 else random.randrange(10000),
+        args[1] if len(args) > 1 else "latino",
+        int(args[2]) if len(args) > 2 else 100,
+    )
