@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "domino-engine"
+version = "0.1.0"
+description = "Motor de reglas de dominó doble 6 por parejas"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["domino_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
